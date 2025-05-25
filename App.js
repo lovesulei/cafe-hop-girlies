@@ -96,11 +96,12 @@ export default function App() {
             title: `Welcome, ${user?.name || "User"}`,
           })}
         />
-        <Stack.Screen
-          name="CafeDetails"
-          component={CafeDetailsScreen}
-          options={({ route }) => ({ title: route.params.cafe.name })}
-        />
+       <Stack.Screen
+  name="CafeDetails"
+  options={({ route }) => ({ title: route.params.cafe.name })}
+>
+  {(props) => <CafeDetailsScreen {...props} currentUser={user} />}
+</Stack.Screen>
         <Stack.Screen
           name="Friends"
           component={FriendScreen}

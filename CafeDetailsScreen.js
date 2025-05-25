@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, Image, ScrollView } from 'react-native';
 import ReviewForm from './ReviewForm';
-import { getFirestore, collection, query, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, orderBy, onSnapshot, addDoc, doc, getDoc  } from 'firebase/firestore';
 import { firebaseApp } from './firebase';
 import { GOOGLE_MAPS_API_KEY } from '@env';
+import { auth } from './firebase';
 
 const db = getFirestore(firebaseApp);
 
@@ -30,7 +31,7 @@ function extractMenuKeywords(reviews) {
     .map(([word]) => word);
 }
 
-export default function CafeDetailsScreen({ route }) {
+export default function CafeDetailsScreen({ route, currentUser }) {
   const { cafe } = route.params;
   const [reviews, setReviews] = useState([]); // Your Firestore reviews
   const [loadingReviews, setLoadingReviews] = useState(true);
@@ -38,12 +39,37 @@ export default function CafeDetailsScreen({ route }) {
   const [googleReviews, setGoogleReviews] = useState([]); // Google reviews for parsing menu keywords
   const [loadingGoogleReviews, setLoadingGoogleReviews] = useState(true);
 
+
   const photoUrl = cafe.photos?.[0]?.photo_reference
     ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${cafe.photos[0].photo_reference}&key=${GOOGLE_MAPS_API_KEY}`
     : null;
 
     const [googleAvgRating, setGoogleAvgRating] = useState(null);
 const [googleTotalRatings, setGoogleTotalRatings] = useState(0);
+
+// for friends
+const [friendIds, setFriendIds] = useState([]);
+
+  // Listen for user's friends array from user document
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        console.log("listening", data.friends)
+        setFriendIds(data.friends || []);
+      } else {
+        setFriendIds([]);
+      }
+    });
+
+    return unsubscribe;
+  }, [currentUser?.uid]);
+
+
+
   // Fetch your Firestore reviews
   useEffect(() => {
     const q = query(
@@ -57,6 +83,7 @@ const [googleTotalRatings, setGoogleTotalRatings] = useState(0);
         revs.push({ id: doc.id, ...doc.data() });
       });
       setReviews(revs);
+
       setLoadingReviews(false);
     });
 
@@ -97,20 +124,26 @@ setGoogleTotalRatings(data.result?.user_ratings_total || 0);
   // Handle submitting your review (to Firestore)
   const handleReviewSubmit = async (review) => {
     try {
-      await addDoc(collection(db, 'cafes', cafe.place_id, 'reviews'), {
-        ...review,
-        createdAt: new Date(),
-      });
-    } catch (e) {
-      alert('Failed to submit review: ' + e.message);
-    }
-  };
+    await addDoc(collection(db, 'cafes', cafe.place_id, 'reviews'), {
+      ...review,
+      createdAt: new Date(),
+      username: currentUser.name || currentUser.email || 'Anonymous',
+      userId: currentUser.uid, // ✅ Add this
+    });
+  } catch (e) {
+    alert('Failed to submit review: ' + e.message);
+  }
+};
 
   const yourAvgRating =
   reviews.length > 0
     ? (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1)
     : null;
 
+// friend reviews
+const friendAndMyReviews = reviews.filter(
+  r => r.userId === currentUser.uid || friendIds.includes(r.userId)
+);
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>{cafe.name}</Text>
@@ -137,20 +170,21 @@ setGoogleTotalRatings(data.result?.user_ratings_total || 0);
       {loadingReviews ? (
         <ActivityIndicator size="small" />
       ) : reviews.length === 0 ? (
-        <Text>No reviews yet.</Text>
+        <Text>No reviews from your friends yet.</Text>
       ) : (
         <FlatList
-          data={reviews}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.review}>
-              <Text style={styles.reviewRating}>⭐ {item.rating}</Text>
-              <Text>{item.comment}</Text>
-              <Text style={styles.reviewDate}>{item.createdAt?.toDate?.().toLocaleString() || item.createdAt}</Text>
-            </View>
-          )}
-          scrollEnabled={false}
-        />
+  data={friendAndMyReviews}
+  keyExtractor={item => item.id}
+  renderItem={({ item }) => (
+    <View style={styles.review}>
+      <Text style={styles.reviewUsername}>{item.username}</Text>
+      <Text style={styles.reviewRating}>⭐ {item.rating}</Text>
+      <Text>{item.comment}</Text>
+      <Text style={styles.reviewDate}>{item.createdAt?.toDate?.().toLocaleString() || item.createdAt}</Text>
+    </View>
+  )}
+  scrollEnabled={false}
+/>
       )}
 
       {/* Menu keyword cloud from Google reviews */}
@@ -197,4 +231,9 @@ const styles = StyleSheet.create({
   color: '#333',
   marginTop: 2,
 },
+reviewUsername: {
+  fontWeight: '700',
+  marginBottom: 4,
+  color: '#555',
+}
 });
