@@ -1,11 +1,11 @@
 import * as Location from 'expo-location';
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Callout } from 'react-native-maps';
 import { GOOGLE_MAPS_API_KEY } from '@env';
 import customMarker from './assets/custom_marker.png';
 
-export default function MapScreen() {
+export default function MapScreen({ navigation }) {
   const [location, setLocation] = useState(null); // current user location
   const [selectedLocation, setSelectedLocation] = useState(null); // user-selected location on map
   const [cafes, setCafes] = useState([]);
@@ -141,47 +141,56 @@ export default function MapScreen() {
   return (
     <View style={{ flex: 1 }}>
       <MapView
-  ref={mapRef}
-  provider="google"
-  style={styles.map}
-  region={region}
-  onPress={(event) => {
-    // Only update selectedLocation if the tap is NOT on a marker.
-    // Markers handle their own onPress.
-    const { coordinate } = event.nativeEvent;
-    setSelectedLocation(coordinate);
-    setNextPageToken(null);
-  }}
-  showsUserLocation={true}
-  zoomEnabled={true}
->
-  {selectedLocation && (
-    <Marker
-      coordinate={selectedLocation}
-      title="Selected Location"
-      pinColor="blue"
-    />
-  )}
+        ref={mapRef}
+        provider="google"
+        style={styles.map}
+        region={region}
+        onPress={(event) => {
+          // Only update selectedLocation if the tap is NOT on a marker.
+          // Markers handle their own onPress.
+          const { coordinate } = event.nativeEvent;
+          setSelectedLocation(coordinate);
+          setNextPageToken(null);
+        }}
+        showsUserLocation={true}
+        zoomEnabled={true}
+      >
+        {selectedLocation && (
+          <Marker
+            coordinate={selectedLocation}
+            title="Selected Location"
+            pinColor="blue"
+          />
+        )}
 
-  {cafes.map((cafe) => (
-    <Marker
-      key={cafe.place_id}
-      coordinate={{
-        latitude: cafe.geometry.location.lat,
-        longitude: cafe.geometry.location.lng,
-      }}
-      title={cafe.name}
-      description={cafe.vicinity}
-      image={customMarker}  // <-- here!
-      onPress={(e) => {
-        // Prevent the map onPress from firing by stopping propagation.
-        e.stopPropagation?.();  // works only if event supports stopPropagation
-        // Or just don't do anything here, so map onPress won't trigger
-        // (Marker tap won't change selectedLocation)
-      }}
-    />
-  ))}
-</MapView>
+        {cafes.map((cafe) => (
+          <Marker
+            key={cafe.place_id}
+            coordinate={{
+              latitude: cafe.geometry.location.lat,
+              longitude: cafe.geometry.location.lng,
+            }}
+            title={cafe.name}
+            description={cafe.vicinity}
+            image={customMarker}  // <-- here!
+            onPress={(e) => {
+              // Prevent the map onPress from firing by stopping propagation.
+              e.stopPropagation?.();  // works only if event supports stopPropagation
+              // Or just don't do anything here, so map onPress won't trigger
+              // (Marker tap won't change selectedLocation)
+              // navigation.navigate('CafeDetails', { cafe })]
+            }}
+          >
+             <Callout onPress={() => navigation.navigate('CafeDetails', { cafe })}>
+              <View style={{ padding: 8, maxWidth: 220 }}>
+                <Text style={{ fontWeight: 'bold', fontSize: 16 }}>{cafe.name}</Text>
+                <Text>{cafe.vicinity}</Text>
+                <Text style={{ color: 'blue', marginTop: 5 }}>Tap here for details</Text>
+              </View>
+            </Callout>
+            </Marker>
+        ))}
+      </MapView>
 
       <View style={styles.zoomContainer}>
         <TouchableOpacity style={styles.zoomButton} onPress={() => zoom('in')}>

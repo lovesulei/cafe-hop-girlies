@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sulei.cafefinder",
+      "bundleIdentifier": "com.sulei.cafefinder"
     },
     "web": {
       "favicon": "./assets/favicon.png"
