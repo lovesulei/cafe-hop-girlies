@@ -1,9 +1,11 @@
 import * as Location from 'expo-location';
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { GOOGLE_MAPS_API_KEY } from '@env';
 import customMarker from './assets/custom_marker.png';
+import { colors, globalStyles } from './globalStyles';
+import arrowImg from './assets/arrow.png';
 
 export default function MapScreen({ navigation }) {
   const [location, setLocation] = useState(null); // current user location
@@ -135,85 +137,103 @@ export default function MapScreen({ navigation }) {
     setLoadingMore(false);
   };
 
-  if (errorMsg) return <Text>{errorMsg}</Text>;
-  if (!region) return <Text>Loading map...</Text>;
+if (errorMsg) {
+    return (
+      <View style={styles.centered}>
+        <Text style={[styles.infoText, { color: colors.clayRed }]}>{errorMsg}</Text>
+      </View>
+    );
+  }
+  if (!region) {
+    return (
+      <View style={styles.centered}>
+        <Text style={globalStyles.title}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex: 1 }}>
-      <MapView
-        ref={mapRef}
-        provider="google"
-        style={styles.map}
-        region={region}
-        onPress={(event) => {
-          // Only update selectedLocation if the tap is NOT on a marker.
-          // Markers handle their own onPress.
-          const { coordinate } = event.nativeEvent;
-          setSelectedLocation(coordinate);
-          setNextPageToken(null);
+    <View style={styles.map}>
+  <MapView
+    ref={mapRef}
+    provider="google"
+    style={styles.map}
+    region={region}
+    onPress={(event) => {
+      const { coordinate } = event.nativeEvent;
+      setSelectedLocation(coordinate);
+      setNextPageToken(null);
+    }}
+    showsUserLocation={true}
+    zoomEnabled={true}
+  >
+    {selectedLocation && (
+      <Marker
+        coordinate={selectedLocation}
+        title="Selected Location"
+        pinColor="blue"
+      />
+    )}
+
+    {cafes.map((cafe) => (
+      <Marker
+        key={cafe.place_id}
+        coordinate={{
+          latitude: cafe.geometry.location.lat,
+          longitude: cafe.geometry.location.lng,
         }}
-        showsUserLocation={true}
-        zoomEnabled={true}
+        title={cafe.name}
+        description={cafe.vicinity}
+        image={customMarker}
+        onPress={(e) => {
+          e.stopPropagation?.();
+        }}
+
       >
-        {selectedLocation && (
-          <Marker
-            coordinate={selectedLocation}
-            title="Selected Location"
-            pinColor="blue"
-          />
-        )}
+        <Callout onPress={() => navigation.navigate('CafeDetails', { cafe })} tooltip>
+          <View style={styles.calloutContainer}>
+            <Text style={globalStyles.calloutTitle}>{cafe.name}</Text>
+            <Text style={globalStyles.calloutAddress}>{cafe.vicinity}</Text>
+            <Image source={arrowImg} style={globalStyles.calloutArrow} />
+          </View>
+        </Callout>
+      </Marker>
+    ))}
+  </MapView>
 
-        {cafes.map((cafe) => (
-          <Marker
-            key={cafe.place_id}
-            coordinate={{
-              latitude: cafe.geometry.location.lat,
-              longitude: cafe.geometry.location.lng,
-            }}
-            title={cafe.name}
-            description={cafe.vicinity}
-            image={customMarker}  // <-- here!
-            onPress={(e) => {
-              // Prevent the map onPress from firing by stopping propagation.
-              e.stopPropagation?.();  // works only if event supports stopPropagation
-              // Or just don't do anything here, so map onPress won't trigger
-              // (Marker tap won't change selectedLocation)
-              // navigation.navigate('CafeDetails', { cafe })]
-            }}
-          >
-             <Callout onPress={() => navigation.navigate('CafeDetails', { cafe })}>
-              <View style={{ padding: 8, maxWidth: 220 }}>
-                <Text style={{ fontWeight: 'bold', fontSize: 16 }}>{cafe.name}</Text>
-                <Text>{cafe.vicinity}</Text>
-                <Text style={{ color: 'blue', marginTop: 5 }}>Tap here for details</Text>
-              </View>
-            </Callout>
-            </Marker>
-        ))}
-      </MapView>
+  <View style={styles.zoomContainer}>
+    <TouchableOpacity style={globalStyles.zoomButton} onPress={() => zoom('in')}>
+      <Text style={globalStyles.zoomText}>＋</Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={globalStyles.zoomButton} onPress={() => zoom('out')}>
+      <Text style={globalStyles.zoomText}>－</Text>
+    </TouchableOpacity>
+  </View>
 
-      <View style={styles.zoomContainer}>
-        <TouchableOpacity style={styles.zoomButton} onPress={() => zoom('in')}>
-          <Text style={styles.zoomText}>＋</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.zoomButton} onPress={() => zoom('out')}>
-          <Text style={styles.zoomText}>－</Text>
-        </TouchableOpacity>
-      </View>
-
-      {nextPageToken && !loadingMore && (
-        <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreCafes}>
-          <Text style={styles.loadMoreText}>Load More Cafes</Text>
-        </TouchableOpacity>
-      )}
-      {loadingMore && <ActivityIndicator size="small" color="#0000ff" style={styles.loadingIndicator} />}
+  {nextPageToken && !loadingMore && (
+    <View style={styles.loadMoreButtonWrapper}>
+      <TouchableOpacity style={globalStyles.loadMoreButton} onPress={loadMoreCafes}>
+        <Text style={globalStyles.buttonText}>Load More Cafes</Text>
+      </TouchableOpacity>
     </View>
+  )}
+
+  {loadingMore && (
+    <ActivityIndicator size="small" color="#0000ff" style={styles.loadingIndicator} />
+  )}
+</View>
+
   );
 }
 
 const styles = StyleSheet.create({
   map: {
     flex: 1,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   zoomContainer: {
     position: 'absolute',
@@ -222,39 +242,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     height: 100,
   },
-  zoomButton: {
-    backgroundColor: 'white',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 1, height: 1 },
-    shadowRadius: 2,
-    elevation: 4,
-    marginBottom: 10,
-  },
-  zoomText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  loadMoreButton: {
+  calloutContainer: {
+  padding: 10,
+  maxWidth: 220,
+  backgroundColor: colors.rosyPink,
+  borderRadius: 12,
+  borderWidth: 0,
+  overflow: 'hidden', // forcefully clips child overflow (e.g. borders)
+},
+  loadingIndicator: {
     position: 'absolute',
     bottom: 20,
     alignSelf: 'center',
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 25,
-    elevation: 4,
   },
-  loadMoreText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  loadingIndicator: {
+  loadMoreButtonWrapper: {
     position: 'absolute',
     bottom: 20,
     alignSelf: 'center',

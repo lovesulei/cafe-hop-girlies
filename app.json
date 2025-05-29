@@ -1,5 +1,6 @@
 {
   "expo": {
+    "assets": ["./assets/fonts/"],
     "name": "cafe-reviews-test",
     "slug": "cafe-reviews-test",
     "version": "1.0.0",
